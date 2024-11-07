@@ -200,26 +200,26 @@ int prepare_file_sensor_readBME280(){
   return file;
 }
 
-int main()
-{
-  int file = prepare_file_sensor_readBME280();
+// int main()
+// {
+//   int file = prepare_file_sensor_readBME280();
 
-  // Read calibration data
-  uint16_t dig_T1;
-  int16_t dig_T2, dig_T3;
-  readCalibrationData(file, dig_T1, dig_T2, dig_T3);
+//   // Read calibration data
+//   uint16_t dig_T1;
+//   int16_t dig_T2, dig_T3;
+//   readCalibrationData(file, dig_T1, dig_T2, dig_T3);
 
-  while (1)
-  {
-    // Read temperature data
-    int32_t rawTemperatureData = _readBME280(file, BME280_TEMP_MSB_REG);
-    double temperature = compensateTemperature(rawTemperatureData, dig_T1, dig_T2, dig_T3);
+//   while (1)
+//   {
+//     // Read temperature data
+//     int32_t rawTemperatureData = _readBME280(file, BME280_TEMP_MSB_REG);
+//     double temperature = compensateTemperature(rawTemperatureData, dig_T1, dig_T2, dig_T3);
 
-    cout << "Temperature: " << temperature << " °C" << endl;
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-  }
+//     cout << "Temperature: " << temperature << " °C" << endl;
+//     std::this_thread::sleep_for(std::chrono::seconds(1));
+//   }
 
-  close(file);
+//   close(file);
 
-  return 0;
-}
+//   return 0;
+// }
