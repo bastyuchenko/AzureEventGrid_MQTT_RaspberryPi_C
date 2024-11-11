@@ -10,9 +10,15 @@
 
 using namespace std;
 
-int32_t t_fine; // Global variable used in temperature compensation
+Bme280Sensor::Bme280Sensor() : file(-1), t_fine(0), dig_T1(0), dig_T2(0), dig_T3(0) {}
 
-int file;
+Bme280Sensor::~Bme280Sensor()
+{
+  if (file >= 0)
+  {
+    close(file);
+  }
+}
 
 // Read calibration data
 uint16_t dig_T1;
@@ -24,11 +30,7 @@ int16_t dig_T2, dig_T3;
 // The specific compensation formula and the constants used are derived from the sensor's design,
 // testing, and calibration done by the manufacturer (Bosch in the case of the BME280). These are
 // provided in the sensor's datasheet and are crucial for accurate measurements.
-double compensateTemperature(
-    int32_t rawTemperatureData,
-    uint16_t dig_T1,
-    int16_t dig_T2,
-    int16_t dig_T3)
+float Bme280Sensor::compensateTemperature(int32_t rawTemperatureData)
 {
   double var1, var2, T;
   var1 = (((double)rawTemperatureData) / 16384.0 - ((double)dig_T1) / 1024.0) * ((double)dig_T2);
@@ -37,11 +39,11 @@ double compensateTemperature(
       * ((double)dig_T3);
   t_fine = (int32_t)(var1 + var2);
   T = (var1 + var2) / 5120.0;
-  return T;
+  return static_cast<float>(T);
 }
 
 // Function to read data from the BME280 sensor
-int32_t raw_readBME280(int file, uint8_t regAddress)
+int32_t Bme280Sensor::rawReadTemperature()
 {
   uint8_t buf[3] = { 0 };
 
@@ -51,7 +53,8 @@ int32_t raw_readBME280(int file, uint8_t regAddress)
   //  is done by writing the address of that register to the device. Once the device knows which
   //  register you want to read, it prepares that data to be sent over the I2C bus when a read
   //  request is made. It is similar to opening a book on a specific page to read.
-  write(file, &regAddress, 1);
+  uint8_t reg = BME280_TEMP_MSB_REG;
+  write(file, &reg, 1);
 
   // Reads first 3 bytes of temperature data starting from &regAddress. The temperature data in the
   // BME280 sensor is stored across three registers. These are typically labeled as
@@ -73,18 +76,18 @@ int32_t raw_readBME280(int file, uint8_t regAddress)
   return data;
 }
 
-Bme280Data readBME280()
+Bme280Data Bme280Sensor::readBME280()
 {
   Bme280Data readings;
 
   // Read temperature data
-  int32_t rawTemperatureData = raw_readBME280(file, BME280_TEMP_MSB_REG);
-  readings.temperature = compensateTemperature(rawTemperatureData, dig_T1, dig_T2, dig_T3);
+  int32_t rawTemperature = rawReadTemperature();
+  readings.temperature = compensateTemperature(rawTemperature);
 
   return readings;
 }
 
-int prepare_file_sensor_readBME280()
+bool Bme280Sensor::initialize()
 {
   // In Linux, hardware devices are often represented as files in the filesystem.
   // open() function is used here to open the I2C device file (/dev/i2c-1).
@@ -177,64 +180,6 @@ void Bme280Sensor::readCalibrationData()
   dig_T3 = (calib[5] << 8) | calib[4];
 }
 
-// Function to read data from the BME280 sensor
-int32_t Bme280Sensor::rawReadTemperature()
-{
-  uint8_t buf[3] = { 0 };
-
-  //  I2C devices like the BME280 have multiple registers, each serving different purposes (e.g.,
-  //  storing temperature data, humidity data, configuration settings, etc.). To read from a
-  //  specific register, you first need to tell the device which register you're interested in. This
-  //  is done by writing the address of that register to the device. Once the device knows which
-  //  register you want to read, it prepares that data to be sent over the I2C bus when a read
-  //  request is made. It is similar to opening a book on a specific page to read.
-  uint8_t reg = BME280_TEMP_MSB_REG;
-  write(file, &reg, 1);
-
-  // Reads first 3 bytes of temperature data starting from &regAddress. The temperature data in the
-  // BME280 sensor is stored across three registers. These are typically labeled as
-  // - MSB (Most Significant Byte) holds the upper part of the measurement data. Contains the upper
-  // 8 bits.
-  // - LSB (Least Significant Byte) holds the middle part of the measurement data. Contains the
-  // upper 8 bits.
-  // - XLSB (Extended Least Significant Byte) contains the lower bits of the measurement data.
-  // Contains the lower 4 bits used and 4 bits of padding or unused data.
-  read(file, buf, 3);
-
-  // Combine the bytes to create the raw data value.
-  // The first byte should be shifter relates to the second byte and contains 8 bits.
-  // The second byte should be shifter relates to the second byte and contains 8 bits.
-  // The third byte should be right-shifter because only 4 bits used and 4 bits of padding or unused
-  // data.
-  int32_t data = (buf[0] << 12) | (buf[1] << 4) | buf[2] >> 4;
-
-  return data;
-}
-
-// Convert the raw temperature data (adc_T) from the BME280 sensor into a usable temperature value
-// in degrees Celsius.
-//
-// The specific compensation formula and the constants used are derived from the sensor's design,
-// testing, and calibration done by the manufacturer (Bosch in the case of the BME280). These are
-// provided in the sensor's datasheet and are crucial for accurate measurements.
-float Bme280Sensor::compensateTemperature(int32_t rawTemperatureData)
-{
-  double var1, var2, T;
-  var1 = (((double)rawTemperatureData) / 16384.0 - ((double)dig_T1) / 1024.0) * ((double)dig_T2);
-  var2 = ((((double)rawTemperatureData) / 131072.0 - ((double)dig_T1) / 8192.0)
-          * (((double)rawTemperatureData) / 131072.0 - ((double)dig_T1) / 8192.0))
-      * ((double)dig_T3);
-  t_fine = (int32_t)(var1 + var2);
-  T = (var1 + var2) / 5120.0;
-  return static_cast<float>(T);
-}
-
-float Bme280Sensor::readTemperature()
-{
-  int32_t rawTemperature = rawReadTemperature();
-  return compensateTemperature(rawTemperature);
-}
-
 int main()
 {
   Bme280Sensor sensor;
@@ -245,8 +190,8 @@ int main()
 
   while (true)
   {
-    float temperature = sensor.readTemperature();
-    cout << "Temperature: " << temperature << " °C" << endl;
+    Bme280Data data = sensor.readBME280();
+    cout << "Temperature: " << data.temperature << " °C" << endl;
     this_thread::sleep_for(chrono::seconds(1));
   }
 

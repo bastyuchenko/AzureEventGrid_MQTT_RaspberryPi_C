@@ -20,12 +20,18 @@
 #define BME280_CTRL_MEAS_REG 0xF4
 #define BME280_CALIB00_REG 0x88
 
+typedef struct Bme280Data {
+    float humidity;
+    float pressure;
+    float temperature;
+} Bme280Data;
+
 class Bme280Sensor {
 public:
     Bme280Sensor();
     ~Bme280Sensor();
     bool initialize();
-    float readTemperature();
+    Bme280Data readBME280();
 
 private:
     int file;
