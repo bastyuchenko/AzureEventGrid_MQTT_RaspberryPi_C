@@ -30,6 +30,12 @@ using namespace std;
 
 int32_t t_fine; // Global variable used in temperature compensation
 
+int file;
+
+// Read calibration data
+uint16_t dig_T1;
+int16_t dig_T2, dig_T3;
+
 // Function to read calibration data
 // After manufactoring the sensor goes through `Calibration`:
 // * Individual Calibration: Each sensor is tested in controlled environmental conditions. The
@@ -81,10 +87,8 @@ double compensateTemperature(
   return T;
 }
 
-
-
 // Function to read data from the BME280 sensor
-int32_t _readBME280(int file, uint8_t regAddress)
+int32_t raw_readBME280(int file, uint8_t regAddress)
 {
   uint8_t buf[3] = { 0 };
 
@@ -116,31 +120,19 @@ int32_t _readBME280(int file, uint8_t regAddress)
   return data;
 }
 
-Bme280Data readBME280() {
-    Bme280Data readings;
-    float rawHumidity = 0.0f;
-    float rawPressure = 0.0f;
-    float rawTemperature = 0.0f;
+Bme280Data readBME280()
+{
+  Bme280Data readings;
 
-    // if (readGauge(&rawHumidity, HUMIDITY) == EXIT_FAILURE ||
-    //     readGauge(&rawPressure, PRESSURE) == EXIT_FAILURE ||
-    //     readGauge(&rawTemperature, TEMPERATURE) == EXIT_FAILURE) {
-    //     fprintf(stderr, "Error reading sensors\n");
-    //     return readings;
-    // }
+  // Read temperature data
+  int32_t rawTemperatureData = raw_readBME280(file, BME280_TEMP_MSB_REG);
+  readings.temperature = compensateTemperature(rawTemperatureData, dig_T1, dig_T2, dig_T3);
 
-    // readings.humidity = rawHumidity;
-    // readings.pressure = rawPressure * 10.0f;
-    // readings.temperature = rawTemperature / 1000.0f;
-
-    // printf("Humidity: %.2f\n", readings.humidity);
-    // printf("Pressure: %.2f hPa\n", readings.pressure);
-    // printf("Temperature: %.2f°C\n", readings.temperature);
-
-    return readings;
+  return readings;
 }
 
-int prepare_file_sensor_readBME280(){
+int prepare_file_sensor_readBME280()
+{
   // In Linux, hardware devices are often represented as files in the filesystem.
   // open() function is used here to open the I2C device file (/dev/i2c-1).
   // /dev/i2c-0, /dev/i2c-1, etc., are device files that represent different I2C buses (different
@@ -200,26 +192,22 @@ int prepare_file_sensor_readBME280(){
   return file;
 }
 
-// int main()
-// {
-//   int file = prepare_file_sensor_readBME280();
+int main()
+{
+  file = prepare_file_sensor_readBME280();
 
-//   // Read calibration data
-//   uint16_t dig_T1;
-//   int16_t dig_T2, dig_T3;
-//   readCalibrationData(file, dig_T1, dig_T2, dig_T3);
+  // Read calibration data
+  readCalibrationData(file, dig_T1, dig_T2, dig_T3);
 
-//   while (1)
-//   {
-//     // Read temperature data
-//     int32_t rawTemperatureData = _readBME280(file, BME280_TEMP_MSB_REG);
-//     double temperature = compensateTemperature(rawTemperatureData, dig_T1, dig_T2, dig_T3);
+  while (1)
+  {
+    Bme280Data data = readBME280();
 
-//     cout << "Temperature: " << temperature << " °C" << endl;
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//   }
+    cout << "Temperature: " << data.temperature << " °C" << endl;
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
 
-//   close(file);
+  close(file);
 
-//   return 0;
-// }
+  return 0;
+}
