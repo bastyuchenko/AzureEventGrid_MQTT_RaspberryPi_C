@@ -5,8 +5,12 @@
 
 #include "bme280.h"
 #include <chrono>
+#include <fcntl.h>
 #include <iostream>
+#include <linux/i2c-dev.h>
+#include <sys/ioctl.h>
 #include <thread>
+#include <unistd.h>
 
 using namespace std;
 
@@ -19,10 +23,6 @@ Bme280Sensor::~Bme280Sensor()
     close(file);
   }
 }
-
-// Read calibration data
-uint16_t dig_T1;
-int16_t dig_T2, dig_T3;
 
 // Convert the raw temperature data (adc_T) from the BME280 sensor into a usable temperature value
 // in degrees Celsius.
@@ -79,11 +79,10 @@ int32_t Bme280Sensor::rawReadTemperature()
 Bme280Data Bme280Sensor::readBME280()
 {
   Bme280Data readings;
-
-  // Read temperature data
   int32_t rawTemperature = rawReadTemperature();
   readings.temperature = compensateTemperature(rawTemperature);
-
+  readings.humidity = 0.0f;
+  readings.pressure = 0.0f;
   return readings;
 }
 
@@ -145,9 +144,7 @@ bool Bme280Sensor::initialize()
   // and fluctuations in individual readings tend to cancel each other out.
   uint8_t config[2] = { BME280_CTRL_MEAS_REG, 0x27 };
   write(file, config, 2);
-
   readCalibrationData();
-
   return true;
 }
 
@@ -174,26 +171,20 @@ void Bme280Sensor::readCalibrationData()
   uint8_t reg = BME280_CALIB00_REG;
   write(file, &reg, 1);
   read(file, calib, 6);
-
   dig_T1 = (calib[1] << 8) | calib[0];
   dig_T2 = (calib[3] << 8) | calib[2];
   dig_T3 = (calib[5] << 8) | calib[4];
 }
 
-int main()
-{
-  Bme280Sensor sensor;
-  if (!sensor.initialize())
-  {
-    return -1;
-  }
-
-  while (true)
-  {
-    Bme280Data data = sensor.readBME280();
-    cout << "Temperature: " << data.temperature << " °C" << endl;
-    this_thread::sleep_for(chrono::seconds(1));
-  }
-
-  return 0;
-}
+// int main() {
+//   Bme280Sensor sensor;
+//   if (!sensor.initialize()) {
+//     return -1;
+//   }
+//   while (true) {
+//     Bme280Data data = sensor.readBME280();
+//     cout << "Temperature: " << data.temperature << " °C" << endl;
+//     this_thread::sleep_for(chrono::seconds(1));
+//   }
+//   return 0;
+// }

@@ -2,11 +2,6 @@
 #define BME280_H
 
 #include <cstdint>
-#include <fcntl.h>
-#include <unistd.h>
-#include <linux/i2c-dev.h>
-#include <sys/ioctl.h>
-#include <iostream>
 
 #define I2C_DEVICE "/dev/i2c-1"
 #define BME280_I2C_ADDR 0x76
@@ -35,7 +30,7 @@ public:
 
 private:
     int file;
-    int32_t t_fine; // Global variable used in temperature compensation
+    int32_t t_fine; // Used in temperature compensation
 
     uint16_t dig_T1;
     int16_t dig_T2, dig_T3;
